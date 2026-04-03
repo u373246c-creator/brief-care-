@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brief Care</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Brief Care">
+
+<style>
+body{
+  margin:0;
+  font-family:-apple-system;
+  background:#0f172a;
+  color:white;
+  padding:16px;
+}
+.card{
+  background:#1e293b;
+  padding:16px;
+  border-radius:16px;
+  margin-bottom:12px;
+}
+button{
+  padding:12px;
+  border:none;
+  border-radius:12px;
+  background:#38bdf8;
+  font-weight:bold;
+}
+textarea,input{
+  width:100%;
+  margin-top:8px;
+  padding:10px;
+  border-radius:10px;
+  border:none;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Brief Care</h2>
+
+<div class="card">
+<h3>朝チェック</h3>
+<input id="mood" placeholder="気分 0-10">
+<input id="fatigue" placeholder="疲れ 0-10">
+<input id="task" placeholder="やること1つ">
+<button onclick="saveMorning()">保存</button>
+</div>
+
+<div class="card">
+<h3>パニックボタン</h3>
+<button onclick="panic()">いましんどい</button>
+<p id="breath"></p>
+</div>
+
+<div class="card">
+<h3>思考ログ</h3>
+<textarea id="log"></textarea>
+<button onclick="saveLog()">保存</button>
+<button onclick="showLog()">履歴</button>
+<pre id="history"></pre>
+</div>
+
+<div class="card">
+<h3>悲嘆プロセス</h3>
+<pre>
+1 精神的打撃と麻痺状態
+2 否認
+3 パニック
+4 怒りと不当感
+5 敵意とうらみ
+6 罪意識
+7 空想形成
+8 孤独感と抑うつ
+9 混乱と無気力
+10 受容
+11 希望とユーモア
+12 新しい自分
+</pre>
+</div>
+
+<script>
+const today = new Date().toISOString().slice(0,10)
+
+function saveMorning(){
+  localStorage.setItem("morning-"+today, JSON.stringify({
+    mood: mood.value,
+    fatigue: fatigue.value,
+    task: task.value
+  }))
+}
+
+function saveLog(){
+  let logs = JSON.parse(localStorage.getItem("log-"+today) || "[]")
+  logs.push(log.value)
+  localStorage.setItem("log-"+today, JSON.stringify(logs))
+  log.value=""
+}
+
+function showLog(){
+  let logs = JSON.parse(localStorage.getItem("log-"+today) || "[]")
+  history.textContent = logs.join("\n---\n")
+}
+
+function panic(){
+  let i=0
+  let phases=["吸う","止める","吐く"]
+  setInterval(()=>{
+    breath.textContent=phases[i%3]
+    i++
+  },2000)
+}
+</script>
+
+</body>
+</html>
