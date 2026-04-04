@@ -53,6 +53,29 @@ pre{
   color:#cbd5e1;
   margin-top:8px;
 }
+.tableWrap{
+  overflow-x:auto;
+  margin-top:12px;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+  background:#0f172a;
+}
+th,td{
+  border:1px solid #475569;
+  padding:8px;
+  text-align:left;
+  vertical-align:top;
+}
+th{
+  background:#334155;
+}
+.small{
+  font-size:12px;
+  color:#cbd5e1;
+}
 </style>
 </head>
 
@@ -82,7 +105,7 @@ pre{
   <h3>思考ログ</h3>
   <textarea id="log" placeholder="頭の中をそのまま書く"></textarea>
   <button onclick="saveLog()">保存</button>
-  <button class="sub" onclick="showLog()">履歴</button>
+  <button class="sub" onclick="showTodayLog()">今日の履歴</button>
   <div id="logStatus" class="status"></div>
   <pre id="history"></pre>
 </div>
@@ -114,32 +137,74 @@ pre{
   </pre>
 </div>
 
+<div class="card">
+  <h3>全履歴</h3>
+  <p class="small">朝チェック・夜チェック・思考ログを日付ごとに一覧表示します</p>
+  <button onclick="renderAllHistory()">全履歴を表示</button>
+  <button class="sub" onclick="downloadCSV()">CSV出力</button>
+  <div id="allHistoryStatus" class="status"></div>
+  <div id="allHistoryTable" class="tableWrap"></div>
+</div>
+
 <script>
 const today = new Date().toISOString().slice(0,10);
-
 let panicTimer = null;
 
+function getStore(){
+  return JSON.parse(localStorage.getItem("briefCareStore") || "{}");
+}
+
+function saveStore(store){
+  localStorage.setItem("briefCareStore", JSON.stringify(store));
+}
+
+function ensureDay(store, date){
+  if(!store[date]){
+    store[date] = {
+      morning: { mood:"", fatigue:"", task:"" },
+      night: { goodThing:"", hardThing:"" },
+      logs: []
+    };
+  }
+  if(!store[date].morning) store[date].morning = { mood:"", fatigue:"", task:"" };
+  if(!store[date].night) store[date].night = { goodThing:"", hardThing:"" };
+  if(!store[date].logs) store[date].logs = [];
+}
+
+function escapeHTML(str){
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function csvEscape(value){
+  const s = String(value ?? "");
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
 function saveMorning(){
-  const data = {
+  const store = getStore();
+  ensureDay(store, today);
+  store[today].morning = {
     mood: document.getElementById("mood").value,
     fatigue: document.getElementById("fatigue").value,
     task: document.getElementById("task").value
   };
-  localStorage.setItem("morning-" + today, JSON.stringify(data));
+  saveStore(store);
   document.getElementById("morningStatus").textContent = "朝チェックを保存しました";
 }
 
 function loadMorning(){
-  const raw = localStorage.getItem("morning-" + today);
-  if(!raw){
-    document.getElementById("morningStatus").textContent = "今日の朝チェックはまだありません";
-    return;
-  }
-  const data = JSON.parse(raw);
+  const store = getStore();
+  ensureDay(store, today);
+  const data = store[today].morning;
   document.getElementById("mood").value = data.mood || "";
   document.getElementById("fatigue").value = data.fatigue || "";
   document.getElementById("task").value = data.task || "";
-  document.getElementById("morningStatus").textContent = "今日の朝チェックを読み込みました";
+  document.getElementById("morningStatus").textContent = data.mood || data.fatigue || data.task
+    ? "今日の朝チェックを読み込みました"
+    : "今日の朝チェックはまだありません";
 }
 
 function saveLog(){
@@ -148,47 +213,56 @@ function saveLog(){
     document.getElementById("logStatus").textContent = "空欄です";
     return;
   }
-  let logs = JSON.parse(localStorage.getItem("log-" + today) || "[]");
-  logs.push({
-    time: new Date().toLocaleTimeString("ja-JP", {hour: "2-digit", minute: "2-digit"}),
+
+  const store = getStore();
+  ensureDay(store, today);
+  store[today].logs.push({
+    time: new Date().toLocaleTimeString("ja-JP", {hour:"2-digit", minute:"2-digit"}),
     text: text
   });
-  localStorage.setItem("log-" + today, JSON.stringify(logs));
+  saveStore(store);
+
   document.getElementById("log").value = "";
   document.getElementById("logStatus").textContent = "思考ログを保存しました";
-  showLog();
+  showTodayLog();
 }
 
-function showLog(){
-  let logs = JSON.parse(localStorage.getItem("log-" + today) || "[]");
+function showTodayLog(){
+  const store = getStore();
+  ensureDay(store, today);
+  const logs = store[today].logs;
+
   if(logs.length === 0){
     document.getElementById("history").textContent = "まだ履歴はありません";
     return;
   }
+
   document.getElementById("history").textContent = logs.map(item =>
-    "【" + item.time + "】\\n" + item.text
-  ).join("\\n\\n---\\n\\n");
+    "【" + item.time + "】\n" + item.text
+  ).join("\n\n---\n\n");
 }
 
 function saveNight(){
-  const data = {
+  const store = getStore();
+  ensureDay(store, today);
+  store[today].night = {
     goodThing: document.getElementById("goodThing").value,
     hardThing: document.getElementById("hardThing").value
   };
-  localStorage.setItem("night-" + today, JSON.stringify(data));
+  saveStore(store);
   document.getElementById("nightStatus").textContent = "夜チェックを保存しました";
 }
 
 function loadNight(){
-  const raw = localStorage.getItem("night-" + today);
-  if(!raw){
-    document.getElementById("nightStatus").textContent = "今日の夜チェックはまだありません";
-    return;
-  }
-  const data = JSON.parse(raw);
+  const store = getStore();
+  ensureDay(store, today);
+  const data = store[today].night;
+
   document.getElementById("goodThing").value = data.goodThing || "";
   document.getElementById("hardThing").value = data.hardThing || "";
-  document.getElementById("nightStatus").textContent = "今日の夜チェックを読み込みました";
+  document.getElementById("nightStatus").textContent = data.goodThing || data.hardThing
+    ? "今日の夜チェックを読み込みました"
+    : "今日の夜チェックはまだありません";
 }
 
 function panic(){
@@ -210,9 +284,132 @@ function stopPanic(){
   document.getElementById("breath").textContent = "";
 }
 
+function renderAllHistory(){
+  const store = getStore();
+  const dates = Object.keys(store).sort().reverse();
+  const container = document.getElementById("allHistoryTable");
+  const status = document.getElementById("allHistoryStatus");
+
+  if(dates.length === 0){
+    container.innerHTML = "";
+    status.textContent = "履歴はまだありません";
+    return;
+  }
+
+  let html = `
+    <table>
+      <thead>
+        <tr>
+          <th>日付</th>
+          <th>気分</th>
+          <th>疲れ</th>
+          <th>今日やること</th>
+          <th>よかったこと</th>
+          <th>しんどかったこと</th>
+          <th>思考ログ</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  dates.forEach(date => {
+    ensureDay(store, date);
+    const day = store[date];
+    const logsText = day.logs.length
+      ? day.logs.map(log => `【${log.time}】 ${log.text}`).join("\n")
+      : "";
+
+    html += `
+      <tr>
+        <td>${escapeHTML(date)}</td>
+        <td>${escapeHTML(day.morning.mood)}</td>
+        <td>${escapeHTML(day.morning.fatigue)}</td>
+        <td>${escapeHTML(day.morning.task)}</td>
+        <td>${escapeHTML(day.night.goodThing)}</td>
+        <td>${escapeHTML(day.night.hardThing)}</td>
+        <td>${escapeHTML(logsText)}</td>
+      </tr>
+    `;
+  });
+
+  html += "</tbody></table>";
+  container.innerHTML = html;
+  status.textContent = dates.length + "日分の履歴を表示しました";
+}
+
+function downloadCSV(){
+  const store = getStore();
+  const dates = Object.keys(store).sort();
+
+  if(dates.length === 0){
+    document.getElementById("allHistoryStatus").textContent = "CSVに出せる履歴がありません";
+    return;
+  }
+
+  let rows = [
+    [
+      "date",
+      "mood",
+      "fatigue",
+      "task",
+      "goodThing",
+      "hardThing",
+      "logTime",
+      "logText"
+    ]
+  ];
+
+  dates.forEach(date => {
+    ensureDay(store, date);
+    const day = store[date];
+
+    if(day.logs.length === 0){
+      rows.push([
+        date,
+        day.morning.mood || "",
+        day.morning.fatigue || "",
+        day.morning.task || "",
+        day.night.goodThing || "",
+        day.night.hardThing || "",
+        "",
+        ""
+      ]);
+    } else {
+      day.logs.forEach(log => {
+        rows.push([
+          date,
+          day.morning.mood || "",
+          day.morning.fatigue || "",
+          day.morning.task || "",
+          day.night.goodThing || "",
+          day.night.hardThing || "",
+          log.time || "",
+          log.text || ""
+        ]);
+      });
+    }
+  });
+
+  const csv = rows.map(row => row.map(csvEscape).join(",")).join("\n");
+  const bom = "\uFEFF";
+  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "brief-care-history.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  document.getElementById("allHistoryStatus").textContent = "CSVを出力しました";
+}
+
 loadMorning();
 loadNight();
-showLog();
+showTodayLog();
+renderAllHistory();
 </script>
 
 </body>
