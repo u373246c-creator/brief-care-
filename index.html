@@ -11,11 +11,12 @@
 <style>
 body{
   margin:0;
-  font-family:-apple-system;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   background:#0f172a;
   color:white;
   padding:16px;
 }
+h2,h3,p{margin-top:0}
 .card{
   background:#1e293b;
   padding:16px;
@@ -23,11 +24,17 @@ body{
   margin-bottom:12px;
 }
 button{
-  padding:12px;
+  padding:12px 14px;
   border:none;
   border-radius:12px;
   background:#38bdf8;
   font-weight:bold;
+  margin-right:8px;
+  margin-top:8px;
+}
+button.sub{
+  background:#334155;
+  color:white;
 }
 textarea,input{
   width:100%;
@@ -35,6 +42,16 @@ textarea,input{
   padding:10px;
   border-radius:10px;
   border:none;
+  box-sizing:border-box;
+}
+pre{
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.status{
+  font-size:14px;
+  color:#cbd5e1;
+  margin-top:8px;
 }
 </style>
 </head>
@@ -42,78 +59,160 @@ textarea,input{
 <body>
 
 <h2>Brief Care</h2>
+<p>短く整えるための自分用メモ</p>
 
 <div class="card">
-<h3>朝チェック</h3>
-<input id="mood" placeholder="気分 0-10">
-<input id="fatigue" placeholder="疲れ 0-10">
-<input id="task" placeholder="やること1つ">
-<button onclick="saveMorning()">保存</button>
+  <h3>朝チェック</h3>
+  <input id="mood" placeholder="気分 0-10">
+  <input id="fatigue" placeholder="疲れ 0-10">
+  <input id="task" placeholder="今日やること1つ">
+  <button onclick="saveMorning()">保存</button>
+  <button class="sub" onclick="loadMorning()">今日の保存内容を表示</button>
+  <div id="morningStatus" class="status"></div>
 </div>
 
 <div class="card">
-<h3>パニックボタン</h3>
-<button onclick="panic()">いましんどい</button>
-<p id="breath"></p>
+  <h3>パニックボタン</h3>
+  <button onclick="panic()">いましんどい</button>
+  <button class="sub" onclick="stopPanic()">停止</button>
+  <p id="breath"></p>
 </div>
 
 <div class="card">
-<h3>思考ログ</h3>
-<textarea id="log"></textarea>
-<button onclick="saveLog()">保存</button>
-<button onclick="showLog()">履歴</button>
-<pre id="history"></pre>
+  <h3>思考ログ</h3>
+  <textarea id="log" placeholder="頭の中をそのまま書く"></textarea>
+  <button onclick="saveLog()">保存</button>
+  <button class="sub" onclick="showLog()">履歴</button>
+  <div id="logStatus" class="status"></div>
+  <pre id="history"></pre>
 </div>
 
 <div class="card">
-<h3>悲嘆プロセス</h3>
-<pre>
+  <h3>夜チェック</h3>
+  <input id="goodThing" placeholder="今日よかったこと1つ">
+  <input id="hardThing" placeholder="今日しんどかったこと1つ">
+  <button onclick="saveNight()">保存</button>
+  <button class="sub" onclick="loadNight()">今日の保存内容を表示</button>
+  <div id="nightStatus" class="status"></div>
+</div>
+
+<div class="card">
+  <h3>悲嘆プロセス</h3>
+  <pre>
 1 精神的打撃と麻痺状態
 2 否認
 3 パニック
 4 怒りと不当感
 5 敵意とうらみ
 6 罪意識
-7 空想形成
+7 空想形成・幻想
 8 孤独感と抑うつ
-9 混乱と無気力
-10 受容
-11 希望とユーモア
-12 新しい自分
-</pre>
+9 精神的混乱とアパシー
+10 あきらめ・受容
+11 新しい希望・ユーモアと笑いの再発見
+12 立ち直りの段階・新たなアイデンティティの誕生
+  </pre>
 </div>
 
 <script>
-const today = new Date().toISOString().slice(0,10)
+const today = new Date().toISOString().slice(0,10);
+
+let panicTimer = null;
 
 function saveMorning(){
-  localStorage.setItem("morning-"+today, JSON.stringify({
-    mood: mood.value,
-    fatigue: fatigue.value,
-    task: task.value
-  }))
+  const data = {
+    mood: document.getElementById("mood").value,
+    fatigue: document.getElementById("fatigue").value,
+    task: document.getElementById("task").value
+  };
+  localStorage.setItem("morning-" + today, JSON.stringify(data));
+  document.getElementById("morningStatus").textContent = "朝チェックを保存しました";
+}
+
+function loadMorning(){
+  const raw = localStorage.getItem("morning-" + today);
+  if(!raw){
+    document.getElementById("morningStatus").textContent = "今日の朝チェックはまだありません";
+    return;
+  }
+  const data = JSON.parse(raw);
+  document.getElementById("mood").value = data.mood || "";
+  document.getElementById("fatigue").value = data.fatigue || "";
+  document.getElementById("task").value = data.task || "";
+  document.getElementById("morningStatus").textContent = "今日の朝チェックを読み込みました";
 }
 
 function saveLog(){
-  let logs = JSON.parse(localStorage.getItem("log-"+today) || "[]")
-  logs.push(log.value)
-  localStorage.setItem("log-"+today, JSON.stringify(logs))
-  log.value=""
+  const text = document.getElementById("log").value.trim();
+  if(!text){
+    document.getElementById("logStatus").textContent = "空欄です";
+    return;
+  }
+  let logs = JSON.parse(localStorage.getItem("log-" + today) || "[]");
+  logs.push({
+    time: new Date().toLocaleTimeString("ja-JP", {hour: "2-digit", minute: "2-digit"}),
+    text: text
+  });
+  localStorage.setItem("log-" + today, JSON.stringify(logs));
+  document.getElementById("log").value = "";
+  document.getElementById("logStatus").textContent = "思考ログを保存しました";
+  showLog();
 }
 
 function showLog(){
-  let logs = JSON.parse(localStorage.getItem("log-"+today) || "[]")
-  history.textContent = logs.join("\n---\n")
+  let logs = JSON.parse(localStorage.getItem("log-" + today) || "[]");
+  if(logs.length === 0){
+    document.getElementById("history").textContent = "まだ履歴はありません";
+    return;
+  }
+  document.getElementById("history").textContent = logs.map(item =>
+    "【" + item.time + "】\\n" + item.text
+  ).join("\\n\\n---\\n\\n");
+}
+
+function saveNight(){
+  const data = {
+    goodThing: document.getElementById("goodThing").value,
+    hardThing: document.getElementById("hardThing").value
+  };
+  localStorage.setItem("night-" + today, JSON.stringify(data));
+  document.getElementById("nightStatus").textContent = "夜チェックを保存しました";
+}
+
+function loadNight(){
+  const raw = localStorage.getItem("night-" + today);
+  if(!raw){
+    document.getElementById("nightStatus").textContent = "今日の夜チェックはまだありません";
+    return;
+  }
+  const data = JSON.parse(raw);
+  document.getElementById("goodThing").value = data.goodThing || "";
+  document.getElementById("hardThing").value = data.hardThing || "";
+  document.getElementById("nightStatus").textContent = "今日の夜チェックを読み込みました";
 }
 
 function panic(){
-  let i=0
-  let phases=["吸う","止める","吐く"]
-  setInterval(()=>{
-    breath.textContent=phases[i%3]
-    i++
-  },2000)
+  stopPanic();
+  const phases = ["吸う 4秒", "止める 4秒", "吐く 6秒"];
+  let i = 0;
+  document.getElementById("breath").textContent = phases[0];
+  panicTimer = setInterval(() => {
+    i = (i + 1) % phases.length;
+    document.getElementById("breath").textContent = phases[i];
+  }, 2000);
 }
+
+function stopPanic(){
+  if(panicTimer){
+    clearInterval(panicTimer);
+    panicTimer = null;
+  }
+  document.getElementById("breath").textContent = "";
+}
+
+loadMorning();
+loadNight();
+showLog();
 </script>
 
 </body>
